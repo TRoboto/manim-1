@@ -37,6 +37,7 @@ class Mobject(object):
     """
     Mathematical Object
     """
+
     CONFIG = {
         "color": WHITE,
         "opacity": 1,
@@ -55,10 +56,10 @@ class Mobject(object):
         "is_fixed_in_frame": False,
         # Must match in attributes of vert shader
         "shader_dtype": [
-            ('point', np.float32, (3,)),
+            ("point", np.float32, (3,)),
         ],
         # Event listener
-        "listen_to_events": False
+        "listen_to_events": False,
     }
 
     def __init__(self, **kwargs):
@@ -68,6 +69,7 @@ class Mobject(object):
         self.family = [self]
         self.locked_data_keys = set()
         self.needs_new_bounding_box = True
+        self.scale_factor = 1
 
         self.init_data()
         self.init_uniforms()
@@ -148,7 +150,9 @@ class Mobject(object):
                 mob.data[key] = mob.data[key][::-1]
         return self
 
-    def apply_points_function(self, func, about_point=None, about_edge=ORIGIN, works_on_bounding_box=False):
+    def apply_points_function(
+        self, func, about_point=None, about_edge=ORIGIN, works_on_bounding_box=False
+    ):
         if about_point is None and about_edge is not None:
             about_point = self.get_bounding_box_point(about_edge)
 
@@ -202,14 +206,16 @@ class Mobject(object):
         return self.data["bounding_box"]
 
     def compute_bounding_box(self):
-        all_points = np.vstack([
-            self.get_points(),
-            *(
-                mob.get_bounding_box()
-                for mob in self.get_family()[1:]
-                if mob.has_points()
-            )
-        ])
+        all_points = np.vstack(
+            [
+                self.get_points(),
+                *(
+                    mob.get_bounding_box()
+                    for mob in self.get_family()[1:]
+                    if mob.has_points()
+                ),
+            ]
+        )
         if len(all_points) == 0:
             return np.zeros((3, self.dim))
         else:
@@ -229,8 +235,8 @@ class Mobject(object):
 
     def is_point_touching(self, point, buff=MED_SMALL_BUFF):
         bb = self.get_bounding_box()
-        mins = (bb[0] - buff)
-        maxs = (bb[2] + buff)
+        mins = bb[0] - buff
+        maxs = bb[2] + buff
         return (point >= mins).all() and (point <= maxs).all()
 
     # Family matters
@@ -310,7 +316,9 @@ class Mobject(object):
         Ensures all attributes which are mobjects are included
         in the submobjects list.
         """
-        mobject_attrs = [x for x in list(self.__dict__.values()) if isinstance(x, Mobject)]
+        mobject_attrs = [
+            x for x in list(self.__dict__.values()) if isinstance(x, Mobject)
+        ]
         self.set_submobjects(list_update(self.submobjects, mobject_attrs))
         return self
 
@@ -323,15 +331,19 @@ class Mobject(object):
             self.center()
         return self
 
-    def arrange_in_grid(self, n_rows=None, n_cols=None,
-                        buff=None,
-                        h_buff=None,
-                        v_buff=None,
-                        buff_ratio=None,
-                        h_buff_ratio=0.5,
-                        v_buff_ratio=0.5,
-                        aligned_edge=ORIGIN,
-                        fill_rows_first=True):
+    def arrange_in_grid(
+        self,
+        n_rows=None,
+        n_cols=None,
+        buff=None,
+        h_buff=None,
+        v_buff=None,
+        buff_ratio=None,
+        h_buff_ratio=0.5,
+        v_buff_ratio=0.5,
+        aligned_edge=ORIGIN,
+        fill_rows_first=True,
+    ):
         submobs = self.submobjects
         if n_rows is None and n_cols is None:
             n_rows = int(np.sqrt(len(submobs)))
@@ -370,9 +382,7 @@ class Mobject(object):
         Returns a new mobject containing multiple copies of this one
         arranged in a grid
         """
-        grid = self.get_group_class()(
-            *(self.copy() for n in range(n_rows * n_cols))
-        )
+        grid = self.get_group_class()(*(self.copy() for n in range(n_rows * n_cols)))
         grid.arrange_in_grid(n_rows, n_cols, **kwargs)
         if height is not None:
             grid.set_height(height)
@@ -571,10 +581,9 @@ class Mobject(object):
         Otherwise, if about_point is given a value, scaling is done with
         respect to that point.
         """
+        self.scale_factor *= scale_factor
         self.apply_points_function(
-            lambda points: scale_factor * points,
-            works_on_bounding_box=True,
-            **kwargs
+            lambda points: scale_factor * points, works_on_bounding_box=True, **kwargs
         )
         return self
 
@@ -582,6 +591,7 @@ class Mobject(object):
         def func(points):
             points[:, dim] *= factor
             return points
+
         self.apply_points_function(func, works_on_bounding_box=True, **kwargs)
         return self
 
@@ -591,8 +601,7 @@ class Mobject(object):
     def rotate(self, angle, axis=OUT, **kwargs):
         rot_matrix_T = rotation_matrix_transpose(angle, axis)
         self.apply_points_function(
-            lambda points: np.dot(points, rot_matrix_T),
-            **kwargs
+            lambda points: np.dot(points, rot_matrix_T), **kwargs
         )
         return self
 
@@ -604,8 +613,7 @@ class Mobject(object):
         if len(kwargs) == 0:
             kwargs["about_point"] = ORIGIN
         self.apply_points_function(
-            lambda points: np.array([function(p) for p in points]),
-            **kwargs
+            lambda points: np.array([function(p) for p in points]), **kwargs
         )
         return self
 
@@ -624,10 +632,9 @@ class Mobject(object):
             kwargs["about_point"] = ORIGIN
         full_matrix = np.identity(self.dim)
         matrix = np.array(matrix)
-        full_matrix[:matrix.shape[0], :matrix.shape[1]] = matrix
+        full_matrix[: matrix.shape[0], : matrix.shape[1]] = matrix
         self.apply_points_function(
-            lambda points: np.dot(points, full_matrix.T),
-            **kwargs
+            lambda points: np.dot(points, full_matrix.T), **kwargs
         )
         return self
 
@@ -635,11 +642,8 @@ class Mobject(object):
         def R3_func(point):
             x, y, z = point
             xy_complex = function(complex(x, y))
-            return [
-                xy_complex.real,
-                xy_complex.imag,
-                z
-            ]
+            return [xy_complex.real, xy_complex.imag, z]
+
         return self.apply_function(R3_func)
 
     def wag(self, direction=RIGHT, axis=DOWN, wag_factor=1.0):
@@ -647,11 +651,14 @@ class Mobject(object):
             alphas = np.dot(mob.get_points(), np.transpose(axis))
             alphas -= min(alphas)
             alphas /= max(alphas)
-            alphas = alphas**wag_factor
-            mob.set_points(mob.get_points() + np.dot(
-                alphas.reshape((len(alphas), 1)),
-                np.array(direction).reshape((1, mob.dim))
-            ))
+            alphas = alphas ** wag_factor
+            mob.set_points(
+                mob.get_points()
+                + np.dot(
+                    alphas.reshape((len(alphas), 1)),
+                    np.array(direction).reshape((1, mob.dim)),
+                )
+            )
         return self
 
     # Positioning methods
@@ -678,14 +685,16 @@ class Mobject(object):
     def to_edge(self, edge=LEFT, buff=DEFAULT_MOBJECT_TO_EDGE_BUFFER):
         return self.align_on_border(edge, buff)
 
-    def next_to(self, mobject_or_point,
-                direction=RIGHT,
-                buff=DEFAULT_MOBJECT_TO_MOBJECT_BUFFER,
-                aligned_edge=ORIGIN,
-                submobject_to_align=None,
-                index_of_submobject_to_align=None,
-                coor_mask=np.array([1, 1, 1]),
-                ):
+    def next_to(
+        self,
+        mobject_or_point,
+        direction=RIGHT,
+        buff=DEFAULT_MOBJECT_TO_MOBJECT_BUFFER,
+        aligned_edge=ORIGIN,
+        submobject_to_align=None,
+        index_of_submobject_to_align=None,
+        coor_mask=np.array([1, 1, 1]),
+    ):
         if isinstance(mobject_or_point, Mobject):
             mob = mobject_or_point
             if index_of_submobject_to_align is not None:
@@ -783,11 +792,12 @@ class Mobject(object):
     def space_out_submobjects(self, factor=1.5, **kwargs):
         self.scale(factor, **kwargs)
         for submob in self.submobjects:
-            submob.scale(1. / factor)
+            submob.scale(1.0 / factor)
         return self
 
-    def move_to(self, point_or_mobject, aligned_edge=ORIGIN,
-                coor_mask=np.array([1, 1, 1])):
+    def move_to(
+        self, point_or_mobject, aligned_edge=ORIGIN, coor_mask=np.array([1, 1, 1])
+    ):
         if isinstance(point_or_mobject, Mobject):
             target = point_or_mobject.get_bounding_box_point(aligned_edge)
         else:
@@ -805,17 +815,12 @@ class Mobject(object):
                 self.rescale_to_fit(mobject.length_over_dim(i), i, stretch=True)
         else:
             self.rescale_to_fit(
-                mobject.length_over_dim(dim_to_match),
-                dim_to_match,
-                stretch=False
+                mobject.length_over_dim(dim_to_match), dim_to_match, stretch=False
             )
         self.shift(mobject.get_center() - self.get_center())
         return self
 
-    def surround(self, mobject,
-                 dim_to_match=0,
-                 stretch=False,
-                 buff=MED_SMALL_BUFF):
+    def surround(self, mobject, dim_to_match=0, stretch=False, buff=MED_SMALL_BUFF):
         self.replace(mobject, dim_to_match, stretch)
         length = mobject.length_over_dim(dim_to_match)
         self.scale((length + buff) / length)
@@ -834,7 +839,7 @@ class Mobject(object):
         )
         self.rotate(
             angle_of_vector(target_vect) - angle_of_vector(curr_vect),
-            about_point=curr_start
+            about_point=curr_start,
         )
         self.shift(start - curr_start)
         return self
@@ -864,7 +869,9 @@ class Mobject(object):
             mob.set_rgba_array(rgba_array)
         return self
 
-    def set_rgba_array_by_color(self, color=None, opacity=None, name="rgbas", recurse=True):
+    def set_rgba_array_by_color(
+        self, color=None, opacity=None, name="rgbas", recurse=True
+    ):
         if color is not None:
             rgbs = np.array([color_to_rgb(c) for c in listify(color)])
         if opacity is not None:
@@ -884,10 +891,7 @@ class Mobject(object):
 
         # Color and opacity
         if color is not None and opacity is not None:
-            rgbas = np.array([
-                [*rgb, o]
-                for rgb, o in zip(*make_even(rgbs, opacities))
-            ])
+            rgbas = np.array([[*rgb, o] for rgb, o in zip(*make_even(rgbs, opacities))])
             for mob in self.get_family(recurse):
                 mob.data[name] = rgbas.copy()
         return self
@@ -957,10 +961,9 @@ class Mobject(object):
         # TODO, this does not behave well when the mobject has points,
         # since it gets displayed on top
         from manimlib.mobject.shape_matchers import BackgroundRectangle
+
         self.background_rectangle = BackgroundRectangle(
-            self, color=color,
-            fill_opacity=opacity,
-            **kwargs
+            self, color=color, fill_opacity=opacity, **kwargs
         )
         self.add_to_back(self.background_rectangle)
         return self
@@ -980,10 +983,7 @@ class Mobject(object):
     def get_bounding_box_point(self, direction):
         bb = self.get_bounding_box()
         indices = (np.sign(direction) + 1).astype(int)
-        return np.array([
-            bb[indices[i]][i]
-            for i in range(3)
-        ])
+        return np.array([bb[indices[i]][i] for i in range(3)])
 
     def get_edge_center(self, direction):
         return self.get_bounding_box_point(direction)
@@ -1007,12 +1007,17 @@ class Mobject(object):
 
     def get_continuous_bounding_box_point(self, direction):
         dl, center, ur = self.get_bounding_box()
-        corner_vect = (ur - center)
-        return center + direction / np.max(np.abs(np.true_divide(
-            direction, corner_vect,
-            out=np.zeros(len(direction)),
-            where=((corner_vect) != 0)
-        )))
+        corner_vect = ur - center
+        return center + direction / np.max(
+            np.abs(
+                np.true_divide(
+                    direction,
+                    corner_vect,
+                    out=np.zeros(len(direction)),
+                    where=((corner_vect) != 0),
+                )
+            )
+        )
 
     def get_top(self):
         return self.get_edge_center(UP)
@@ -1084,12 +1089,12 @@ class Mobject(object):
         template = self.copy()
         template.set_submobjects([])
         alphas = np.linspace(0, 1, n_pieces + 1)
-        return Group(*[
-            template.copy().pointwise_become_partial(
-                self, a1, a2
-            )
-            for a1, a2 in zip(alphas[:-1], alphas[1:])
-        ])
+        return Group(
+            *[
+                template.copy().pointwise_become_partial(self, a1, a2)
+                for a1, a2 in zip(alphas[:-1], alphas[1:])
+            ]
+        )
 
     def get_z_index_reference_point(self):
         # TODO, better place to define default z_index_group?
@@ -1102,10 +1107,7 @@ class Mobject(object):
         return self.set_color(mobject.get_color())
 
     def match_dim_size(self, mobject, dim, **kwargs):
-        return self.rescale_to_fit(
-            mobject.length_over_dim(dim), dim,
-            **kwargs
-        )
+        return self.rescale_to_fit(mobject.length_over_dim(dim), dim, **kwargs)
 
     def match_width(self, mobject, **kwargs):
         return self.match_dim_size(mobject, 0, **kwargs)
@@ -1213,17 +1215,11 @@ class Mobject(object):
             # If empty, simply add n point mobjects
             null_mob = self.copy()
             null_mob.set_points([self.get_center()])
-            self.set_submobjects([
-                null_mob.copy()
-                for k in range(n)
-            ])
+            self.set_submobjects([null_mob.copy() for k in range(n)])
             return self
         target = curr + n
         repeat_indices = (np.arange(target) * curr) // target
-        split_factors = [
-            (repeat_indices == i).sum()
-            for i in range(curr)
-        ]
+        split_factors = [(repeat_indices == i).sum() for i in range(curr)]
         new_submobs = []
         for submob, sf in zip(self.submobjects, split_factors):
             new_submobs.append(submob)
@@ -1253,16 +1249,10 @@ class Mobject(object):
             else:
                 func = interpolate
 
-            self.data[key][:] = func(
-                mobject1.data[key],
-                mobject2.data[key],
-                alpha
-            )
+            self.data[key][:] = func(mobject1.data[key], mobject2.data[key], alpha)
         for key in self.uniforms:
             self.uniforms[key] = interpolate(
-                mobject1.uniforms[key],
-                mobject2.uniforms[key],
-                alpha
+                mobject1.uniforms[key], mobject2.uniforms[key], alpha
             )
         return self
 
@@ -1304,12 +1294,18 @@ class Mobject(object):
         self.locked_data_keys = set(keys)
 
     def lock_matching_data(self, mobject1, mobject2):
-        for sm, sm1, sm2 in zip(self.get_family(), mobject1.get_family(), mobject2.get_family()):
+        for sm, sm1, sm2 in zip(
+            self.get_family(), mobject1.get_family(), mobject2.get_family()
+        ):
             keys = sm.data.keys() & sm1.data.keys() & sm2.data.keys()
-            sm.lock_data(list(filter(
-                lambda key: np.all(sm1.data[key] == sm2.data[key]),
-                keys,
-            )))
+            sm.lock_data(
+                list(
+                    filter(
+                        lambda key: np.all(sm1.data[key] == sm2.data[key]),
+                        keys,
+                    )
+                )
+            )
         return self
 
     def unlock_data(self):
@@ -1325,6 +1321,7 @@ class Mobject(object):
                 func(mob)
                 mob.refresh_shader_wrapper_id()
             return self
+
         return wrapper
 
     @affects_shader_info_id
@@ -1364,15 +1361,12 @@ class Mobject(object):
         vec4 color, vec3 point, vec3 unit_normal.
         The code should change the color variable
         """
-        self.replace_shader_code(
-            "///// INSERT COLOR FUNCTION HERE /////",
-            glsl_code
-        )
+        self.replace_shader_code("///// INSERT COLOR FUNCTION HERE /////", glsl_code)
         return self
 
-    def set_color_by_xyz_func(self, glsl_snippet,
-                              min_value=-5.0, max_value=5.0,
-                              colormap="viridis"):
+    def set_color_by_xyz_func(
+        self, glsl_snippet, min_value=-5.0, max_value=5.0, colormap="viridis"
+    ):
         """
         Pass in a glsl expression in terms of x, y and z which returns
         a float.
@@ -1387,7 +1381,7 @@ class Mobject(object):
                 glsl_snippet,
                 float(min_value),
                 float(max_value),
-                get_colormap_code(rgb_list)
+                get_colormap_code(rgb_list),
             )
         )
         return self
@@ -1513,10 +1507,7 @@ class Mobject(object):
         return list(it.chain(*[sm.get_event_listners() for sm in self.get_family()]))
 
     def get_has_event_listner(self):
-        return any(
-            mob.get_event_listners()
-            for mob in self.get_family()
-        )
+        return any(mob.get_event_listners() for mob in self.get_family())
 
     def add_mouse_motion_listner(self, callback):
         self.add_event_listner(EventType.MouseMotionEvent, callback)
@@ -1564,8 +1555,7 @@ class Mobject(object):
 
     def throw_error_if_no_points(self):
         if not self.has_points():
-            message = "Cannot call Mobject.{} " +\
-                      "for a Mobject with no points"
+            message = "Cannot call Mobject.{} " + "for a Mobject with no points"
             caller_name = sys._getframe(1).f_code.co_name
             raise Exception(message.format(caller_name))
 
