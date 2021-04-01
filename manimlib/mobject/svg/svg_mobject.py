@@ -328,11 +328,11 @@ class SVGMobject(VMobject):
             else 0.0
             for key in ("cx", "cy", "rx", "ry")
         ]
-        return (
-            Circle(**parse_style(style))
-            .scale(rx * RIGHT + ry * UP)
-            .shift(x * RIGHT + y * DOWN)
-        )
+        result = Circle()
+        result.stretch(rx, 0)
+        result.stretch(ry, 1)
+        result.shift(x * RIGHT + y * DOWN)
+        return result
 
     def rect_to_mobject(self, rect_element: MinidomElement, style: dict):
         """Converts a SVG <rect> command to a VMobject.
@@ -351,7 +351,6 @@ class SVGMobject(VMobject):
             Creates either a Rectangle, or RoundRectangle, VMobject from a
             rect element.
         """
-
         stroke_width = rect_element.getAttribute("stroke-width")
         corner_radius = rect_element.getAttribute("rx")
 
