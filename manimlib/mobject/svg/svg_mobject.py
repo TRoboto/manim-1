@@ -205,7 +205,11 @@ class SVGMobject(VMobject):
         VMobjectFromSVGPathstring
             A VMobject from the given path string, or d attribute.
         """
-        return VMobjectFromSVGPathstring(path_string, **parse_style(style))
+        return VMobjectFromSVGPathstring(
+            path_string,
+            **parse_style(style),
+            **self.path_string_config,
+        )
 
     def use_to_mobjects(
         self, use_element: MinidomElement, local_style: Dict
