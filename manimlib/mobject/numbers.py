@@ -42,8 +42,7 @@ class DecimalNumber(VMobject):
             self.add(self.unit_sign)
 
         self.arrange(
-            buff=self.digit_buff_per_font_unit * self.get_font_size(),
-            aligned_edge=DOWN
+            buff=self.digit_buff_per_font_unit * self.get_font_size(), aligned_edge=DOWN
         )
 
         # Handle alignment of parts that should be aligned
@@ -100,31 +99,39 @@ class DecimalNumber(VMobject):
         - num_decimal_places
         - field_name (e.g. 0 or 0.real)
         """
-        config = dict([
-            (attr, getattr(self, attr))
-            for attr in [
-                "include_sign",
-                "group_with_commas",
-                "num_decimal_places",
+        config = dict(
+            [
+                (attr, getattr(self, attr))
+                for attr in [
+                    "include_sign",
+                    "group_with_commas",
+                    "num_decimal_places",
+                ]
             ]
-        ])
+        )
         config.update(kwargs)
-        return "".join([
-            "{",
-            config.get("field_name", ""),
-            ":",
-            "+" if config["include_sign"] else "",
-            "," if config["group_with_commas"] else "",
-            ".", str(config["num_decimal_places"]), "f",
-            "}",
-        ])
+        return "".join(
+            [
+                "{",
+                config.get("field_name", ""),
+                ":",
+                "+" if config["include_sign"] else "",
+                "," if config["group_with_commas"] else "",
+                ".",
+                str(config["num_decimal_places"]),
+                "f",
+                "}",
+            ]
+        )
 
     def get_complex_formatter(self, **kwargs):
-        return "".join([
-            self.get_formatter(field_name="0.real"),
-            self.get_formatter(field_name="0.imag", include_sign=True),
-            "i"
-        ])
+        return "".join(
+            [
+                self.get_formatter(field_name="0.real"),
+                self.get_formatter(field_name="0.imag", include_sign=True),
+                "i",
+            ]
+        )
 
     def set_value(self, number):
         move_to_point = self.get_edge_center(self.edge_to_fix)
