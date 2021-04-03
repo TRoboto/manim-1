@@ -14,18 +14,35 @@ class ImageMobject(Mobject):
         "height": 4,
         "opacity": 1,
         "shader_folder": "image",
+        "pixel_array_dtype": "uint8",
         "shader_dtype": [
-            ('point', np.float32, (3,)),
-            ('im_coords', np.float32, (2,)),
-            ('opacity', np.float32, (1,)),
-        ]
+            ("point", np.float32, (3,)),
+            ("im_coords", np.float32, (2,)),
+            ("opacity", np.float32, (1,)),
+        ],
     }
 
     def __init__(self, filename, **kwargs):
         path = get_full_raster_image_path(filename)
         self.image = Image.open(path)
+        self.pixel_array = np.array(self.image)
         self.texture_paths = {"Texture": path}
         super().__init__(**kwargs)
+        self.change_to_rgba_array()
+
+    def change_to_rgba_array(self):
+        """Converts an RGB array into RGBA with the alpha value opacity maxed."""
+        pa = self.pixel_array
+        if len(pa.shape) == 2:
+            pa = pa.reshape(list(pa.shape) + [1])
+        if pa.shape[2] == 1:
+            pa = pa.repeat(3, axis=2)
+        if pa.shape[2] == 3:
+            alphas = 255 * np.ones(
+                list(pa.shape[:2]) + [1], dtype=self.pixel_array_dtype
+            )
+            pa = np.append(pa, alphas, axis=2)
+        self.pixel_array = pa
 
     def init_data(self):
         self.data = {
@@ -54,10 +71,12 @@ class ImageMobject(Mobject):
             raise Exception("Cannot sample color from outside an image")
 
         pw, ph = self.image.size
-        rgb = self.image.getpixel((
-            int((pw - 1) * x_alpha),
-            int((ph - 1) * y_alpha),
-        ))
+        rgb = self.image.getpixel(
+            (
+                int((pw - 1) * x_alpha),
+                int((ph - 1) * y_alpha),
+            )
+        )
         return np.array(rgb) / 255
 
     def get_shader_data(self):
