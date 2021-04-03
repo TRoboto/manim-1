@@ -20,6 +20,173 @@ from manimpango import TextSetting
 TEXT_MOB_SCALE_FACTOR = 0.001048
 
 
+class Paragraph(VGroup):
+    r"""Display a paragraph of text.
+    For a given :class:`.Paragraph` ``par``, the attribute ``par.chars`` is a
+    :class:`.VGroup` containing all the lines. In this context, every line is
+    constructed as a :class:`.VGroup` of characters contained in the line.
+    Parameters
+    ----------
+    line_spacing : :class:`int`, optional
+        Represents the spacing between lines. Default to -1, which means auto.
+    alignment : :class:`str`, optional
+        Defines the alignment of paragraph. Default to "left". Possible values are "left", "right", "center"
+    Examples
+    --------
+    Normal usage::
+        paragraph = Paragraph('this is a awesome', 'paragraph',
+                              'With \nNewlines', '\tWith Tabs',
+                              '  With Spaces', 'With Alignments',
+                              'center', 'left', 'right')
+    Remove unwanted invisible characters::
+        self.play(Transform(remove_invisible_chars(paragraph.chars[0:2]),
+                            remove_invisible_chars(paragraph.chars[3][0:3]))
+    """
+
+    def __init__(self, *text, line_spacing=-1, alignment=None, **config):
+        self.line_spacing = line_spacing
+        self.alignment = alignment
+        VGroup.__init__(self, **config)
+
+        lines_str = "\n".join(list(text))
+        self.lines_text = Text(lines_str, line_spacing=line_spacing, **config)
+        lines_str_list = lines_str.split("\n")
+        self.chars = self.gen_chars(lines_str_list)
+
+        chars_lines_text_list = VGroup()
+        char_index_counter = 0
+        for line_index in range(lines_str_list.__len__()):
+            chars_lines_text_list.add(
+                self.lines_text[
+                    char_index_counter : char_index_counter
+                    + lines_str_list[line_index].__len__()
+                    + 1
+                ]
+            )
+            char_index_counter += lines_str_list[line_index].__len__() + 1
+        self.lines = []
+        self.lines.append([])
+        for line_no in range(chars_lines_text_list.__len__()):
+            self.lines[0].append(chars_lines_text_list[line_no])
+        self.lines_initial_positions = []
+        for line_no in range(self.lines[0].__len__()):
+            self.lines_initial_positions.append(self.lines[0][line_no].get_center())
+        self.lines.append([])
+        self.lines[1].extend(
+            [self.alignment for _ in range(chars_lines_text_list.__len__())]
+        )
+        VGroup.__init__(
+            self, *[self.lines[0][i] for i in range(self.lines[0].__len__())], **config
+        )
+        self.move_to(np.array([0, 0, 0]))
+        if self.alignment:
+            self.set_all_lines_alignments(self.alignment)
+
+    def gen_chars(self, lines_str_list):
+        """Function to convert plain string to 2d-VGroup of chars. 2d-VGroup mean "VGroup of VGroup".
+        Parameters
+        ----------
+        lines_str_list : :class:`str`
+            Plain text string.
+        Returns
+        -------
+        :class:`~.VGroup`
+            The generated 2d-VGroup of chars.
+        """
+        char_index_counter = 0
+        chars = VGroup()
+        for line_no in range(lines_str_list.__len__()):
+            chars.add(VGroup())
+            chrs = [*self.lines_text.submobjects]
+            chars[line_no].add(
+                *chrs[
+                    char_index_counter : char_index_counter
+                    + lines_str_list[line_no].__len__()
+                    + 1
+                ]
+            )
+            char_index_counter += lines_str_list[line_no].__len__() + 1
+        return chars
+
+    def set_all_lines_alignments(self, alignment):
+        """Function to set all line's alignment to a specific value.
+        Parameters
+        ----------
+        alignment : :class:`str`
+            Defines the alignment of paragraph. Possible values are "left", "right", "center".
+        """
+        for line_no in range(0, self.lines[0].__len__()):
+            self.change_alignment_for_a_line(alignment, line_no)
+        return self
+
+    def set_line_alignment(self, alignment, line_no):
+        """Function to set one line's alignment to a specific value.
+        Parameters
+        ----------
+        alignment : :class:`str`
+            Defines the alignment of paragraph. Possible values are "left", "right", "center".
+        line_no : :class:`int`
+            Defines the line number for which we want to set given alignment.
+        """
+        self.change_alignment_for_a_line(alignment, line_no)
+        return self
+
+    def set_all_lines_to_initial_positions(self):
+        """Set all lines to their initial positions."""
+        self.lines[1] = [None for _ in range(self.lines[0].__len__())]
+        for line_no in range(0, self.lines[0].__len__()):
+            self[line_no].move_to(
+                self.get_center() + self.lines_initial_positions[line_no]
+            )
+        return self
+
+    def set_line_to_initial_position(self, line_no):
+        """Function to set one line to initial positions.
+        Parameters
+        ----------
+        line_no : :class:`int`
+            Defines the line number for which we want to set given alignment.
+        """
+        self.lines[1][line_no] = None
+        self[line_no].move_to(self.get_center() + self.lines_initial_positions[line_no])
+        return self
+
+    def change_alignment_for_a_line(self, alignment, line_no):
+        """Function to change one line's alignment to a specific value.
+        Parameters
+        ----------
+        alignment : :class:`str`
+            Defines the alignment of paragraph. Possible values are "left", "right", "center".
+        line_no : :class:`int`
+            Defines the line number for which we want to set given alignment.
+        """
+        self.lines[1][line_no] = alignment
+        if self.lines[1][line_no] == "center":
+            self[line_no].move_to(
+                np.array([self.get_center()[0], self[line_no].get_center()[1], 0])
+            )
+        elif self.lines[1][line_no] == "right":
+            self[line_no].move_to(
+                np.array(
+                    [
+                        self.get_right()[0] - self[line_no].get_width() / 2,
+                        self[line_no].get_center()[1],
+                        0,
+                    ]
+                )
+            )
+        elif self.lines[1][line_no] == "left":
+            self[line_no].move_to(
+                np.array(
+                    [
+                        self.get_left()[0] + self[line_no].get_width() / 2,
+                        self[line_no].get_center()[1],
+                        0,
+                    ]
+                )
+            )
+
+
 class Text(SVGMobject):
     CONFIG = {
         # Mobject
@@ -27,7 +194,7 @@ class Text(SVGMobject):
         "height": None,
         "stroke_width": 0,
         # Text
-        "font": '',
+        "font": "",
         "gradient": None,
         "lsh": -1,
         "size": 1,
@@ -48,8 +215,8 @@ class Text(SVGMobject):
         digest_config(self, config)
         self.lsh = self.size if self.lsh == -1 else self.lsh
         text_without_tabs = text
-        if text.find('\t') != -1:
-            text_without_tabs = text.replace('\t', ' ' * self.tab_width)
+        if text.find("\t") != -1:
+            text_without_tabs = text.replace("\t", " " * self.tab_width)
         self.text = text_without_tabs
         file_name = self.text2svg()
         PangoUtils.remove_last_M(file_name)
@@ -70,10 +237,10 @@ class Text(SVGMobject):
             self.scale(TEXT_MOB_SCALE_FACTOR * self.font_size)
 
     def remove_empty_path(self, file_name):
-        with open(file_name, 'r') as fpr:
+        with open(file_name, "r") as fpr:
             content = fpr.read()
-        content = re.sub(r'<path .*?d=""/>', '', content)
-        with open(file_name, 'w') as fpw:
+        content = re.sub(r'<path .*?d=""/>', "", content)
+        with open(file_name, "w") as fpw:
             fpw.write(content)
 
     def apply_space_chars(self):
@@ -86,10 +253,10 @@ class Text(SVGMobject):
         self.set_submobjects(submobs)
 
     def find_indexes(self, word):
-        m = re.match(r'\[([0-9\-]{0,}):([0-9\-]{0,})\]', word)
+        m = re.match(r"\[([0-9\-]{0,}):([0-9\-]{0,})\]", word)
         if m:
-            start = int(m.group(1)) if m.group(1) != '' else 0
-            end = int(m.group(2)) if m.group(2) != '' else len(self.text)
+            start = int(m.group(1)) if m.group(1) != "" else 0
+            end = int(m.group(2)) if m.group(2) != "" else len(self.text)
             start = len(self.text) + start if start < 0 else start
             end = len(self.text) + end if end < 0 else end
             return [(start, end)]
@@ -102,10 +269,7 @@ class Text(SVGMobject):
         return indexes
 
     def get_parts_by_text(self, word):
-        return VGroup(*(
-            self[i:j]
-            for i, j in self.find_indexes(word)
-        ))
+        return VGroup(*(self[i:j] for i, j in self.find_indexes(word)))
 
     def get_part_by_text(self, word):
         parts = self.get_parts_by_text(word)
@@ -116,18 +280,18 @@ class Text(SVGMobject):
 
     def full2short(self, config):
         for kwargs in [config, self.CONFIG]:
-            if kwargs.__contains__('line_spacing_height'):
-                kwargs['lsh'] = kwargs.pop('line_spacing_height')
-            if kwargs.__contains__('text2color'):
-                kwargs['t2c'] = kwargs.pop('text2color')
-            if kwargs.__contains__('text2font'):
-                kwargs['t2f'] = kwargs.pop('text2font')
-            if kwargs.__contains__('text2gradient'):
-                kwargs['t2g'] = kwargs.pop('text2gradient')
-            if kwargs.__contains__('text2slant'):
-                kwargs['t2s'] = kwargs.pop('text2slant')
-            if kwargs.__contains__('text2weight'):
-                kwargs['t2w'] = kwargs.pop('text2weight')
+            if kwargs.__contains__("line_spacing_height"):
+                kwargs["lsh"] = kwargs.pop("line_spacing_height")
+            if kwargs.__contains__("text2color"):
+                kwargs["t2c"] = kwargs.pop("text2color")
+            if kwargs.__contains__("text2font"):
+                kwargs["t2f"] = kwargs.pop("text2font")
+            if kwargs.__contains__("text2gradient"):
+                kwargs["t2g"] = kwargs.pop("text2gradient")
+            if kwargs.__contains__("text2slant"):
+                kwargs["t2s"] = kwargs.pop("text2slant")
+            if kwargs.__contains__("text2weight"):
+                kwargs["t2w"] = kwargs.pop("text2weight")
 
     def set_color_by_t2c(self, t2c=None):
         t2c = t2c if t2c else self.t2c
@@ -174,9 +338,9 @@ class Text(SVGMobject):
             temp_settings.append(TextSetting(start, len(self.text), *fsw))
         settings = sorted(temp_settings, key=lambda setting: setting.start)
 
-        if re.search(r'\n', self.text):
+        if re.search(r"\n", self.text):
             line_num = 0
-            for start, end in self.find_indexes('\n'):
+            for start, end in self.find_indexes("\n"):
                 for setting in settings:
                     if setting.line_num == -1:
                         setting.line_num = line_num
@@ -201,12 +365,12 @@ class Text(SVGMobject):
         size = self.size * 10
         lsh = self.lsh * 10
 
-        if self.font == '':
-            self.font = get_customization()['style']['font']
+        if self.font == "":
+            self.font = get_customization()["style"]["font"]
 
         dir_name = get_text_dir()
         hash_name = self.text2hash()
-        file_name = os.path.join(dir_name, hash_name) + '.svg'
+        file_name = os.path.join(dir_name, hash_name) + ".svg"
         if os.path.exists(file_name):
             return file_name
         settings = self.text2settings()
