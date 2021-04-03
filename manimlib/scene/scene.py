@@ -102,6 +102,10 @@ class Scene(object):
         # If there is a window, enter a loop
         # which updates the frame while under
         # the hood calling the pyglet event loop
+        if not self.preview:
+            # If the scene is just being
+            # written, ignore interact calls
+            return
         self.quit_interaction = False
         self.lock_static_mobject_data()
         while not (self.window.is_closing or self.quit_interaction):
